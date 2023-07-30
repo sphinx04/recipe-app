@@ -13,96 +13,64 @@ struct Ingredient: Hashable {
 }
 
 struct RecipeView: View {
-    @State var searchText = ""
-    private var foodData = FoodData()
-    
-    @State var ingredients = [Ingredient]()
-    
-    
+    @ObservedObject var foodData = FoodData()
     @State private var showingAlert = false
     @State private var grams = 100
     @State private var currentIngredient = ""
     @State private var bottomBarVisible = false
+    @State var searchSuggestionsVisible = true
+    @State var searchText = ""
+    @State var selectedCategory: String?
     
-    //To model vvv
-    
-    private func resultMacro() -> MacroTuple {
-        
-        var result: MacroTuple = (0,0,0,0)
-        
-        
-        for ingredient in ingredients {
-            let ingredientMacro = foodData.allFoodDict[ingredient.name] ?? (0,0,0,0)
-            
-            let multiplier = Float(ingredient.grams) / 100.0
-            
-            result.calories += Int(Float(ingredientMacro.calories) * multiplier)
-            result.carbs += Int(Float(ingredientMacro.carbs) * multiplier)
-            result.fats += Int(Float(ingredientMacro.fats) * multiplier)
-            result.proteins += Int(Float(ingredientMacro.proteins) * multiplier)
-        }
-        
-        return result
-    }
+    @Environment(\.isSearching) var isSearching
     
     
     var filteredAllFoodData: [String: MacroTuple] {
         if searchText.isEmpty {
             return [:]
         } else {
-            return foodData.allFoodDict.filter { $0.key.localizedCaseInsensitiveContains(searchText) }
+            let result = foodData.allFoodDict.filter { $0.key.localizedCaseInsensitiveContains(searchText) }
+            return result
         }
+    }
+    
+    private func showAlert(key: String) {
+            guard !foodData.ingredients.contains(where: { $0.name == key }) else { return }
+            currentIngredient = key
+            showingAlert.toggle()
+            searchText = ""
+            selectedCategory = nil
+            grams = 100
     }
     
     var body: some View {
         VStack(spacing: 0) {
             NavigationStack {
                 
-            Text("Choco moko loco")
-                .font(.largeTitle)
-            
-            List {
-                Section {
-                    ForEach(ingredients, id: \.self) { ingredient in
-                        HStack {
-                            Text(ingredient.name)
-                            
-                            Spacer()
-                            
-                            Text("\(ingredient.grams) grams")
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 100)
-                            
-                            Button {
-                                withAnimation {
-                                    ingredients.removeAll(where: {$0 == ingredient })
-                                }
-                            } label: {
-                                Image(systemName: "minus")
+                RecipeTitleView()
+                
+                List {
+                    Section {
+                        ForEach(foodData.ingredients, id: \.self) { ingredient in
+                            InRecipeListItemView(ingredient: ingredient) {
+                                foodData.ingredients.removeAll(where: {$0 == ingredient })
                             }
-                        }
-                        .swipeActions(allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                ingredients.removeAll(where: {$0 == ingredient })
-                                
-                            } label: {
-                                Text("Delete")
-                            }
-                            .tint(.red)
                         }
                     }
+                    .onSubmit(of: .search) {
+                        selectedCategory = nil
+                    }
                 }
-            }
-            .listStyle(.plain)
-            
-            Spacer()
+                .listStyle(.plain)
+                
+                Spacer()
             }
             .alert(currentIngredient.capitalized, isPresented: $showingAlert) {
                 TextField(currentIngredient.capitalized, value: $grams, format: .number)
                     .keyboardType(.numberPad)
                 Button {
                     withAnimation {
-                        ingredients.append(Ingredient(name: currentIngredient, grams: grams))
+                        foodData.ingredients.append(Ingredient(name: currentIngredient, grams: grams))
                     }
                 } label: {
                     Text("Add")
@@ -110,21 +78,38 @@ struct RecipeView: View {
             } message: {
                 Text("How many grams?")
             }
-            .searchable(text: $searchText) {
-                ForEach(filteredAllFoodData.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                    HStack {
-                        Text(key)
-                        
-                        Spacer()
-                        
-                        Button {
-                            guard !ingredients.contains(where: { $0.name == key }) else { return }
-                            currentIngredient = key
-                            showingAlert.toggle()
-                            searchText = ""
-                            grams = 100
-                        } label: {
-                            Image(systemName: "plus")
+            .searchable(text: $searchText, prompt: "Search for ingredients") {
+                if searchText.isEmpty {
+                    if selectedCategory == nil {
+                        ForEach(foodData.foodCategories.sorted(by: { $0.key < $1.key }), id: \.key) { key, _ in
+                            
+                            HStack {
+                                Circle()
+                                    .fill(Color.random().opacity(0.2))
+                                    .frame(width: 50)
+                                Text(key)
+                                    .font(.title3)
+                                
+                                Spacer()
+                            }
+                            .onTapGesture {
+                                selectedCategory = key
+                            }
+                        }
+                        //FIRST FOREACH
+                    }
+                    else {
+                        ForEach(foodData.foodCategories[selectedCategory!]!.sorted(by: { $0.key < $1.key }), id: \.key) { key, _ in
+                            
+                            SearchListItemView(name: key) {
+                                showAlert(key: key)
+                            }
+                        } //FIRST FOREACH
+                    }
+                } else {
+                    ForEach(filteredAllFoodData.sorted(by: { $0.key < $1.key }), id: \.key) { key, _ in
+                        SearchListItemView(name: key) {
+                            showAlert(key: key)
                         }
                     }
                 }
@@ -132,36 +117,22 @@ struct RecipeView: View {
             .padding(.bottom, 30)
         }
         .safeAreaInset(edge: .bottom) {
-            if resultMacro() > (0,0,0,0) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HeaderView()
-                    
-                    HStack {
-                        Text("Total:")
-                            .font(.title2)
-                        Spacer()
-                        Text(String(resultMacro().calories))
-                            .foregroundColor(.red)
-                            .frame(width: 50)
-                        Text(String(resultMacro().carbs))
-                            .foregroundColor(.blue)
-                            .frame(width: 30)
-                        Text(String(resultMacro().fats))
-                            .foregroundColor(.orange)
-                            .frame(width: 30)
-                        Text(String(resultMacro().proteins))
-                            .foregroundColor(.brown)
-                            .frame(width: 30)
-                    }
-                    .padding(.horizontal)
-                }
-                .padding()
-                .background(LinearGradient(colors: [.green.opacity(0.3), .orange.opacity(0.2)],
-                                           startPoint: .bottomLeading, endPoint: .bottomTrailing)
-                    .overlay(.ultraThinMaterial)
-                )
+            if foodData.resultMacro() > (0,0,0,0) {
+                MacroSummaryView(foodData: foodData)
             }
         }
+    }
+}
+
+public extension Color {
+
+    static func random(randomOpacity: Bool = false) -> Color {
+        Color(
+            red: .random(in: 0...1),
+            green: .random(in: 0...1),
+            blue: .random(in: 0...1),
+            opacity: randomOpacity ? .random(in: 0...1) : 1
+        )
     }
 }
 

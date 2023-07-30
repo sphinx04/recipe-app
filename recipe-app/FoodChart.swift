@@ -13,6 +13,7 @@ final class FoodData: ObservableObject {
     
     @Published var foodCategories: [String: [String: MacroTuple]] = [:]
     @Published var allFoodDict: [String: MacroTuple] = [:]
+    @Published var ingredients = [Ingredient]()
     
     init() {
         fillFoodCategories()
@@ -23,6 +24,25 @@ final class FoodData: ObservableObject {
             }
         }
         
+    }
+    
+    func resultMacro() -> MacroTuple {
+        
+        var result: MacroTuple = (0,0,0,0)
+        
+        
+        for ingredient in ingredients {
+            let ingredientMacro = allFoodDict[ingredient.name] ?? (0,0,0,0)
+            
+            let multiplier = Float(ingredient.grams) / 100.0
+            
+            result.calories += Int(Float(ingredientMacro.calories) * multiplier)
+            result.carbs += Int(Float(ingredientMacro.carbs) * multiplier)
+            result.fats += Int(Float(ingredientMacro.fats) * multiplier)
+            result.proteins += Int(Float(ingredientMacro.proteins) * multiplier)
+        }
+        
+        return result
     }
     
     private func fillFoodCategories() {

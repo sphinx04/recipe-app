@@ -9,30 +9,10 @@ import SwiftUI
 
 struct IngredientsView: View {
     
-    private var foodData = FoodData()
-    
     var body: some View {
         NavigationStack() {
             ZStack {
-                ScrollView {
-                    ForEach(foodData.foodCategories.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                        Section {
-                            ForEach(value.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                                FoodItemView(name: key, macros: value)
-                            }
-                        } header: {
-                            HStack {
-                                Text(key)
-                                    .padding(.top)
-                                    .padding(.horizontal, 20)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                
-                                Spacer()
-                            }
-                        } //SECTION
-                    } //FIRST FOREACH
-                } //SCROLLVIEW
+                CategirizedList()
             } //ZSTACK
             .navigationTitle("Ingredients")
             .safeAreaInset(edge: .top) {
@@ -47,8 +27,8 @@ struct IngredientsView: View {
                 }
                 .padding()
                 .background(LinearGradient(colors: [.green.opacity(0.3), .orange.opacity(0.2)],
-                                                     startPoint: .bottomLeading, endPoint: .bottomTrailing)
-                                          .overlay(.ultraThinMaterial)
+                                           startPoint: .bottomLeading, endPoint: .bottomTrailing)
+                    .overlay(.ultraThinMaterial)
                 )
             }
             .navigationBarHidden(true)
@@ -113,5 +93,31 @@ struct HeaderView: View {
         .fontWeight(.heavy)
         .frame(height: 20)
         .padding(.horizontal)
+    }
+}
+
+struct CategirizedList: View {
+    private var foodData = FoodData()
+    
+    var body: some View {
+        ScrollView {
+            ForEach(foodData.foodCategories.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                Section {
+                    ForEach(value.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                        FoodItemView(name: key, macros: value)
+                    }
+                } header: {
+                    HStack {
+                        Text(key)
+                            .padding(.top)
+                            .padding(.horizontal, 20)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                    }
+                } //SECTION
+            } //FIRST FOREACH
+        } //SCROLLVIEW
     }
 }
